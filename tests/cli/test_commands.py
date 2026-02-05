@@ -25,7 +25,15 @@ def _convert_argparse_output_to_pre_py311_format(output: str) -> str:
     ["mila"]
     + [
         f"mila {command}"
-        for command in ["docs", "intranet", "init", "forward", "code", "serve"]
+        for command in [
+            "docs",
+            "intranet",
+            "init",
+            "forward",
+            "code",
+            "cursor",
+            "serve",
+        ]
     ]
     + [
         f"mila serve {serve_subcommand}"

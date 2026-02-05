@@ -59,7 +59,11 @@ from milatools.utils.remote_v1 import (
     RemoteV1,
     SlurmRemote,
 )
-from milatools.utils.vscode_utils import get_code_command, sync_vscode_extensions
+from milatools.utils.vscode_utils import (
+    get_code_command,
+    get_cursor_command,
+    sync_vscode_extensions,
+)
 
 from ..__version__ import __version__
 
@@ -257,9 +261,66 @@ def add_arguments(parser: argparse.ArgumentParser):
     _add_allocation_options(code_parser)
 
     if sys.platform == "win32":
-        code_parser.set_defaults(function=code_v1)
+        code_parser.set_defaults(function=code_v1, cli_command="code")
     else:
-        code_parser.set_defaults(function=code)
+        code_parser.set_defaults(function=code, cli_command="code")
+
+    # ----- mila cursor ------
+
+    cursor_parser = subparsers.add_parser(
+        "cursor",
+        help="Open a remote Cursor session on a compute node.",
+    )
+    cursor_parser.add_argument(
+        "PATH",
+        help=(
+            "Path to open on the remote machine. Defaults to $HOME.\n"
+            "Can be a relative or absolute path. When a relative path (that doesn't "
+            "start with a '/', like foo/bar) is passed, the path is relative to the "
+            "$HOME directory on the selected cluster.\n"
+            "For example, foo/project will be interpreted as $HOME/foo/project."
+        ),
+        type=str,
+        default=".",
+        nargs="?",
+    )
+    cursor_parser.add_argument(
+        "--cluster",
+        type=str,
+        # choices=CLUSTERS,
+        default="mila",
+        help="Which cluster to connect to.",
+    )
+    cursor_parser.add_argument(
+        "--command",
+        default=get_cursor_command(),
+        help=(
+            "Command to use to start Cursor\n"
+            '(defaults to "cursor" or the value of $MILATOOLS_CURSOR_COMMAND)'
+        ),
+        metavar="VALUE",
+    )
+    cursor_parser.add_argument(
+        "--job",
+        type=int,
+        default=None,
+        help="Job ID to connect to",
+        metavar="JOB_ID",
+    )
+    cursor_parser.add_argument(
+        "--node",
+        type=str,
+        default=None,
+        help="Node to connect to",
+        metavar="NODE",
+    )
+
+    _add_allocation_options(cursor_parser)
+
+    if sys.platform == "win32":
+        cursor_parser.set_defaults(function=code_v1, cli_command="cursor")
+    else:
+        cursor_parser.set_defaults(function=code, cli_command="cursor")
 
     # ----- mila sync vscode-extensions ------
 
@@ -456,18 +517,16 @@ def setup_logging(verbose: int) -> None:
     global_loglevel = (
         logging.CRITICAL
         if verbose == 0
-        else logging.WARNING
-        if verbose == 1
-        else logging.INFO
-        if verbose == 2
-        else logging.DEBUG
+        else (
+            logging.WARNING
+            if verbose == 1
+            else logging.INFO if verbose == 2 else logging.DEBUG
+        )
     )
     package_loglevel = (
         logging.WARNING
         if verbose == 0
-        else logging.INFO
-        if verbose == 1
-        else logging.DEBUG
+        else logging.INFO if verbose == 1 else logging.DEBUG
     )
     logging.basicConfig(
         level=global_loglevel,
@@ -532,10 +591,10 @@ def forward(
 
 
 @deprecated(
-    "Support for the `mila code` command is now deprecated on Windows machines, as it "
-    "does not support ssh keys with passphrases or clusters where 2FA is enabled. "
-    "Please consider switching to the Windows Subsystem for Linux (WSL) to run "
-    "`mila code`."
+    "Support for the `mila code` and `mila cursor` commands is now deprecated on "
+    "Windows machines, as it does not support ssh keys with passphrases or clusters "
+    "where 2FA is enabled. Please consider switching to the Windows Subsystem for "
+    "Linux (WSL) to run these commands."
 )
 def code_v1(
     path: str,
@@ -545,20 +604,21 @@ def code_v1(
     node: str | None,
     alloc: list[str],
     cluster: str = "mila",
+    cli_command: str = "code",
 ):
-    """Open a remote VSCode session on a compute node.
+    """Open a remote editor session on a compute node.
 
     Arguments:
         path: Path to open on the remote machine
-        command: Command to use to start vscode
-            (defaults to "code" or the value of $MILATOOLS_CODE_COMMAND)
+        command: Command to use to start the editor
         persist: Whether the server should persist or not
         job: Job ID to connect to
         node: Node to connect to
         alloc: Extra options to pass to slurm
+        cli_command: CLI command name used to connect (e.g., "code" or "cursor")
     """
     if command is None:
-        command = get_code_command()
+        command = get_code_command() if cli_command == "code" else get_cursor_command()
     command_path = shutil.which(command)
     if not command_path:
         raise CommandNotFoundError(command)
@@ -573,7 +633,7 @@ def code_v1(
                 "specify the account to use when submitting a job. You can specify "
                 "this in the job resources with `--alloc`, like so: "
                 "`--alloc --account=<account_to_use>`, for example:\n"
-                f"mila code {path} --cluster {cluster} --alloc "
+                f"mila {cli_command} {path} --cluster {cluster} --alloc "
                 f"--account=your-account-here"
             )
 
@@ -587,7 +647,7 @@ def code_v1(
     if node is None:
         cnode = _find_allocation(
             remote,
-            job_name="mila-code",
+            job_name=f"mila-{cli_command}",
             job=job,
             node=node,
             alloc=alloc,
@@ -653,7 +713,7 @@ def code_v1(
         print("This allocation is persistent and is still active.")
         print("To reconnect to this node:")
         console.print(
-            f"  mila code {path} "
+            f"  mila {cli_command} {path} "
             + (f"--cluster={cluster} " if cluster != "mila" else "")
             + f"--node {node_name}",
             style="bold",

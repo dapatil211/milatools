@@ -48,17 +48,18 @@ async def code(
     node: str | None,
     alloc: list[str],
     cluster: str = "mila",
+    cli_command: str = "code",
 ) -> ComputeNode | int:
-    """Open a remote VSCode session on a compute node.
+    """Open a remote editor session on a compute node.
 
     Arguments:
         path: Path to open on the remote machine
-        command: Command to use to start vscode (defaults to "code" or the value of \
-            $MILATOOLS_CODE_COMMAND)
+        command: Command to use to start the editor
         persist: Whether the server should persist or not after exiting the terminal.
         job: ID of the job to connect to
         node: Name of the node to connect to
         alloc: Extra options to pass to slurm
+        cli_command: CLI command name used to connect (e.g., "code" or "cursor")
     """
     # Check that the `code` command is in the $PATH so that we can use just `code` as
     # the command.
@@ -84,7 +85,7 @@ async def code(
         relative_path = _path.relative_to(home)
         console.log(
             f"Hint: you can use a path relative to your $HOME instead of an absolute path.\n"
-            f"For example, `mila code {path}` is the same as `mila code {relative_path}`.",
+            f"For example, `mila {cli_command} {path}` is the same as `mila {cli_command} {relative_path}`.",
             highlight=True,
             markup=True,
         )
@@ -111,7 +112,7 @@ async def code(
     # NOTE: Perhaps we could eventually do this check dynamically, if the cluster is an
     # unknown cluster?
     sync_vscode_extensions_task = None
-    if not internet_on_compute_nodes(cluster):
+    if cli_command == "code" and not internet_on_compute_nodes(cluster):
         # Sync the VsCode extensions from the local machine over to the target cluster.
         console.log(
             f"Installing VSCode extensions that are on the local machine on {cluster}.",
@@ -145,7 +146,7 @@ async def code(
                 "specify the account to use when submitting a job. You can specify "
                 "this in the job resources with `--alloc`, like so: "
                 "`--alloc --account=<account_to_use>`, for example:\n"
-                f"mila code some_path --cluster {cluster} --alloc "
+                f"mila {cli_command} some_path --cluster {cluster} --alloc "
                 f"--account=your-account-here"
             )
         # Set the job name to `mila-code`. This should not be changed by the user
@@ -154,12 +155,12 @@ async def code(
         if any(flag.split("=")[0] in ("-J", "--job-name") for flag in alloc):
             raise MilatoolsUserError(
                 "The job name flag (--job-name or -J) should be left unset for now "
-                "because we use the job name to measure how many people use `mila "
-                "code` on the various clusters. We also make use of the job name when "
-                "the call to `salloc` is interrupted before we have a chance to know "
-                "the job id."
+                "because we use the job name to measure how many people use the "
+                "editor commands on the various clusters. We also make use of the job "
+                "name when the call to `salloc` is interrupted before we have a "
+                "chance to know the job id."
             )
-        job_name = "mila-code"
+        job_name = f"mila-{cli_command}"
         alloc = alloc + [f"--job-name={job_name}"]
 
         if persist:
@@ -198,7 +199,7 @@ async def code(
     console.print("This allocation is persistent and is still active.")
     console.print("To reconnect to this job, run the following:")
     console.print(
-        f"  mila code {relative_path or path} "
+        f"  mila {cli_command} {relative_path or path} "
         + (f"--cluster {cluster} " if cluster != "mila" else "")
         + f"--job {compute_node.job_id}",
         style="bold",

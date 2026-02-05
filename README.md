@@ -101,6 +101,43 @@ The `--alloc` option may be used to pass extra arguments to `salloc` when alloca
 If you already have an allocation on a compute node, you may use the `--node NODENAME` or `--job JOBID` options to connect to that node.
 
 
+### mila cursor
+
+Connect a Cursor instance to a compute node. `mila cursor` first allocates a compute node using slurm (you can pass slurm options as well using `--alloc`), and then calls the `cursor` command with the appropriate options to start a remote coding session on the allocated node.
+
+You can simply Ctrl+C the process to end the session.
+
+```
+usage: mila cursor [-h] [--cluster {mila,cedar,narval,beluga,graham}] [--alloc ...]
+                   [--command VALUE] [--job VALUE] [--node VALUE] [--persist]
+                   PATH
+
+positional arguments:
+  PATH                  Path to open on the remote machine
+
+options:
+  -h, --help            show this help message and exit
+  --alloc ...           Extra options to pass to slurm
+  --cluster {mila,cedar,narval,beluga,graham}
+                        Which cluster to connect to.
+  --command VALUE       Command to use to start Cursor (defaults to "cursor" or the value
+                        of $MILATOOLS_CURSOR_COMMAND)
+  --job VALUE           Job ID to connect to
+  --node VALUE          Node to connect to
+  --persist             Whether the server should persist or not
+```
+
+For example:
+
+```bash
+mila cursor path/to/my/experiment
+```
+
+The `--alloc` option may be used to pass extra arguments to `salloc` when allocating a node (for example, `--alloc --gres=gpu:1` to allocate 1 GPU). `--alloc` should be at the end, because it will take all of the arguments that come after it.
+
+If you already have an allocation on a compute node, you may use the `--node NODENAME` or `--job JOBID` options to connect to that node.
+
+
 ### mila serve
 
 The purpose of `mila serve` is to make it easier to start notebooks, logging servers, etc. on the compute nodes and connect to them.

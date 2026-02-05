@@ -57,6 +57,10 @@ def get_code_command() -> str:
     return os.environ.get("MILATOOLS_CODE_COMMAND", "code")
 
 
+def get_cursor_command() -> str:
+    return os.environ.get("MILATOOLS_CURSOR_COMMAND", "cursor")
+
+
 def _get_local_vscode_executable_path(code_command: str | None = None) -> str:
     if code_command is None:
         code_command = get_code_command()
